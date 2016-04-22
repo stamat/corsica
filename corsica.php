@@ -19,10 +19,6 @@ $url .= $url_part;
 
 $all_headers = array();
 
-$data = array();
-$data['username_email'] = 'stamat';
-$data['password'] = 'asdasd123';
-
 $method = strtolower($_SERVER['REQUEST_METHOD']);
 $accepted_methods = array('get', 'post', 'delete', 'options', 'put', 'patch');
 
@@ -30,14 +26,36 @@ if (array_search($method, $accepted_methods) === false) {
 	exit(0);
 }
 
-function get() {
+function post() {
 	global $curl;
+	
+	$size = sizeof($_POST);
+	if ($size === 0) {
+		$size = 1;
+	}
+	
+	curl_setopt($curl, CURLOPT_POST, $size);
+	curl_setopt($curl, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
 }
 
-function post() {
-	global $curl, $data;
-	curl_setopt($curl,CURLOPT_POST, sizeof($data));
-	curl_setopt($curl,CURLOPT_POSTFIELDS, $data);
+function delete() {
+	global $curl;
+	
+	curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+}
+
+function put() {
+	global $curl;
+	
+	curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
+	curl_setopt($curl, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+}
+
+function patch() {
+	global $curl;
+	
+	curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+	curl_setopt($curl, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
 }
 
 function applyRequestHeaders() {
@@ -65,6 +83,21 @@ function applyRequestHeaders() {
     return $headers;
 }
 
+function applyResponseHeaders($header_text) {
+    foreach (explode("\r\n", $header_text) as $i => $line) {
+        list ($key, $value) = explode(': ', $line);
+		if (empty($value)) {
+			continue;
+		}
+		
+		if (strpos('Access-Control', $value) !== false) {
+			continue;
+		}
+		
+		header($line);
+	}
+}
+
 $headers = applyRequestHeaders();
 //var_dump($all_headers);
 $headers[] = 'Origin: '.$domain;
@@ -85,21 +118,6 @@ $result = curl_exec($curl);
 
 $header_size = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
 $header = substr($result, 0, $header_size);
-
-function applyResponseHeaders($header_text) {
-    foreach (explode("\r\n", $header_text) as $i => $line) {
-        list ($key, $value) = explode(': ', $line);
-		if (empty($value)) {
-			continue;
-		}
-		
-		if (strpos('Access-Control', $value) !== false) {
-			continue;
-		}
-		
-		header($line);
-	}
-}
 
 applyResponseHeaders($header);
 $body = substr($result, $header_size);
