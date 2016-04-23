@@ -1,4 +1,6 @@
 # CORSica
+![corsica old flag](logo.png)
+
 A very simple HTTP CORS proxy written in PHP using cURL
 
 ## How it works?
