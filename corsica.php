@@ -12,7 +12,8 @@ $curl = curl_init();
 
 // URL of the target (this should be changed to be modular)
 $domain = "YOUR_DOMAIN_HERE";
-$url = "http://".$domain;
+$protocol = "http://";
+$url = $protocol.$domain;
 $script_rel_path = preg_replace('/.*public_html/','', __FILE__); //not all servers have public_html
 $url_part = str_replace($script_rel_path, '', $_SERVER['REQUEST_URI']);
 $url .= $url_part;
@@ -29,12 +30,7 @@ if (array_search($method, $accepted_methods) === false) {
 function post() {
 	global $curl;
 	
-	$size = sizeof($_POST);
-	if ($size === 0) {
-		$size = 1;
-	}
-	
-	curl_setopt($curl, CURLOPT_POST, $size);
+	curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
 	curl_setopt($curl, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
 }
 
@@ -62,19 +58,21 @@ function applyRequestHeaders() {
 	global $all_headers, $method;
 	
     $headers = array();
-	$accepted_headers = array('Accept', 'Cookie', 'User-Agent', 'Accept-Encoding', 'Accept-Language', 'X-Requested-With', 'Content-Type', 'Connection', 'Keep-Alive');
+	$forbidden_headers = array('Origin', 'Host', 'Referer', 'X-Forwarded-For', 'X-Real-Ip');
+	
     foreach($_SERVER as $key => $value) {
-        if (substr($key, 0, 5) <> 'HTTP_') {
-            continue;
+		if (substr($key, 0, 5) <> 'HTTP_' && $key !== 'CONTENT_TYPE' && $key !== 'CONTENT_LENGTH') {
+			continue;
         }
+		
+		if ($key === 'CONTENT_TYPE' || $key === 'CONTENT_LENGTH') {
+			$key = 'HTTP_'.$key;
+		}
+		
         $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
 		$all_headers[$header] = $value;
 		
-		if (array_search($header, $accepted_headers) === false) {
-			continue;
-		}
-		
-		if($method === 'options' && $header === 'X-Requested-With') { //preflight doesnt allow x-requested-with on some setups
+		if (array_search($header, $forbidden_headers) !== false) {
 			continue;
 		}
 		
@@ -100,7 +98,8 @@ function applyResponseHeaders($header_text) {
 
 $headers = applyRequestHeaders();
 //var_dump($all_headers);
-$headers[] = 'Origin: '.$domain;
+$headers[] = 'Host: '.$domain;
+$headers[] = 'Origin: '.$protocol.$domain;
 
 curl_setopt($curl,CURLOPT_URL, $url);
 curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
